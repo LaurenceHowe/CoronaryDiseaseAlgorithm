@@ -1,82 +1,90 @@
-#Load necessary packages
+#########
+# SETUP #
+#########
 
-require(readstata13)
+###STEP 1: Load necessary packages
+
 require(data.table)
 
-################################
-#Read in different data sources#
-################################
+
+###STEP 2: Read in different data sources
+
 
 #1) Hospital episodes statistics 
-baseline <- fread("S:/FPHS_IHI_DataLab_UKBiobank/application-992/baseline/November2016/ukb8413.csv",
-                  select = c("eid", "53-0.0"), sep=",")
-hes <- read.dta13("S:/FPHS_IHI_DataLab_UKBiobank/application-992/HES/November2016/hesinNov2016.dta")
-baseline$eid<-as.numeric(baseline$eid)
+hes <- fread("hes.file")
 
-#Merge the files and sort out the dates of admission and enrollment
+#2) Date of enrollment
 
-dataset<-merge(baseline,hes,by="eid")
-dataset$date<-as.Date(dataset$"53-0.0")
+baseline <- fread("phenotype.file",
+                  select = c("eid", "53-0.0"), sep = ",")
+baseline$eid <- as.numeric(baseline$eid)
+
+
+#3) Mortality register
+
+death <- fread("phenotype.file",
+               select = c(1, 1639, 1642:1686), sep = ",") #Change to columns of mortality registry data in phenotype file
+
+#4) Self-reported operations
+
+selfreportops <- fread("phenotype.file",
+                       select = c(1, 783:814), sep = ",") #Change to columns of self-report operations in phenotype file
+selfreportops$eid <- as.numeric(selfreportops$eid)
+
+
+#5) Self-reported illnesses
+
+selfreport <- fread("phenotype.file",
+                      select = c(1, 446:457, 552:580, 290, 317), sep = ",") #Change to columns of self-report questionnaires in phenotype file
+
+
+#6) Self-reported medications
+
+medications <- fread("phenotype.file",
+                    select = c(1, 639:686), sep = ",") #Change to columns of medications in phenotype file
+
+
+
+### STEP 3: Combine HES with enrollment date to distinguish between prevalence and incidence 
+
+dataset <- merge(baseline, hes, by="eid")
+
+#Convert dates to R date format
+dataset$date <- as.Date(dataset$"53-0.0")
 dataset$epistart <- as.Date(dataset$epistart)
 dataset$admidate <- as.Date(dataset$admidate)
 
+#Take the difference between the two HES dates and enrollment date.
+dataset$datediff1 <- dataset$epistart - dataset$date
+dataset$numericdiff1 <- as.numeric(dataset$datediff1, units = "days")
 
-dataset$datediff1<-dataset$epistart-dataset$date
-dataset$numericdiff1<-as.numeric(dataset$datediff1, units="days")
+dataset$datediff2 <- dataset$admidate-dataset$date
+dataset$numericdiff2 <- as.numeric(dataset$datediff2, units = "days")
 
-dataset$datediff2<-dataset$admidate-dataset$date
-dataset$numericdiff2<-as.numeric(dataset$datediff2, units="days")
+### STEP 4: Set up the output file
 
-#2) Mortality register
-
-death <- fread("S:/FPHS_IHI_DataLab_UKBiobank/application-992/baseline/November2016/ukb8413.csv",
-               select = c(1,1642:1686,1639), sep=",")
-
-#3) Self-reported operations
-
-selfreportops <- fread("S:/FPHS_IHI_DataLab_UKBiobank/application-992/baseline/November2016/ukb8413.csv",
-                       select = c(1, 783:814), sep=",")
-selfreportops$eid<-as.numeric(selfreportops$eid)
-
-
-#4) Self-reported illnesses
-
-selfreport <- fread("S:/FPHS_IHI_DataLab_UKBiobank/application-992/baseline/November2016/ukb8413.csv",
-                      select = c(1, 446:457,552:580,290,317), sep=",")
-
-
-#5) Self-reported medications
-
-medications<- fread("S:/FPHS_IHI_DataLab_UKBiobank/application-992/baseline/November2016/ukb8413.csv",
-                    select = c(1,639:686), sep=",")
-
-
+output <- baseline[,c(1)]
 
 #############
 # ALGORITHM #
 #############
 
-output<-baseline[,c(1)]
-######################################
-#First row: I21 in secondary care EHR#
-######################################
+#First row: I21 in secondary care EHR
 
-#a) Inclusion criteria
-#I21 in secondary care EHR
-i21<-c("I210", "I211", "I212", "I213", "I214", "I219")
-subsqmi<-c("I220", "I221", "I228", "I229")
-oldmi<-c("I252")
+#a) Inclusion criteria (I21 in secondary care EHR)
 
-all<-c("I210", "I211", "I212", "I213", "I214", "I219",
-       "I220", "I221", "I228", "I229", "I252")
+i21<-c("I210", "I211", "I212", "I213", "I214", "I219") #I21
+subsqmi<-c("I220", "I221", "I228", "I229") #Subsequent MI ICD codes
+oldmi<-c("I252") #Old MI ICD code
 
-incl<-dataset[which(dataset$diag_icd10%in%i21),]
-row1<-dataset[which(dataset$eid%in%incl$eid),]
+all<-c(i21,subsqmi,oldmi) #Combination of all 3
 
-#b) Level I
+incl<-dataset[which(dataset$diag_icd10%in%i21),] #Extract all data-points from HES involving an I21 code
+row1<-dataset[which(dataset$eid%in%incl$eid),] #Extract individuals with an I21 data-point in HES
 
-#Output
-output$Level1[output$eid%in%row1$eid]<-"MI"
+#b) Level I Output
+
+output$Level1[output$eid%in%row1$eid]<-"MI" #Set these individuals level 1 to MI
 
 #c) Level II
 
@@ -103,106 +111,6 @@ output$Level2[output$eid%in%anyinc$eid
 
 output$Level2[output$eid%in%onlyinc$eid]<-"Incident MI"
 output$Level2[output$eid%in%onlyprev$eid]<-"Prevalent MI"
-
-
-#d) Level III
-
-#Single or  multiple incident only
-
-#More than one new MI code separated by 28 days or more
-
-list<-unique(onlyinc$eid)
-checki<-list()
-
-for (i in 1:length(list)) {
-  temp<-paste(list[i])
-  checki[[i]]<-onlyinc[which(onlyinc$eid==temp),]
-  checki[[i]]$max1<-max(checki[[i]]$numericdiff1)-min(checki[[i]]$numericdiff1)
-  checki[[i]]$max2<-max(checki[[i]]$numericdiff2)-min(checki[[i]]$numericdiff2)
-}
-
-
-temp<-do.call(rbind.data.frame, checki)
-mult1<-temp[which(temp$max1>=28 | temp$max2>=28),]
-
-#Any subsequent MI code
-
-mult2<-onlyinc[which(onlyinc$diag_icd10%in%subsqmi),]
-
-#An old MI code at the same time as MI code or 7 days or less after
-incl<-onlyinc[which(onlyinc$diag_icd10%in%oldmi),]
-temp<-onlyinc[which(onlyinc$eid%in%incl$eid),]
-
-list<-unique(temp$eid)
-test<-list()
-
-for (i in 1:length(list)) {
-  id<-paste(list[i])
-  test[[i]]<-temp[which(temp$eid==id),]
-  #If more than two entries they have multiple MI anyway
-  test[[i]]$yes[nrow(test[[i]]>2)]<-1
-  test[[i]]$max1<-max(test[[i]]$numericdiff1)-min(test[[i]]$numericdiff1)
-  test[[i]]$max2<-max(test[[i]]$numericdiff2)-min(test[[i]]$numericdiff2)
-  test[[i]]$yes[test[[i]]$max1<8 | test[[i]]$max2<8]<-1
-}
-mult3a<-do.call(rbind.data.frame, test)
-mult3b<-mult3a[which(mult3a$yes==1),]
-multinc<-output[which(output$eid%in%mult1$eid 
-                      |output$eid%in%mult2$eid
-                      |output$eid%in%mult3b$eid),]
-
-#Single or  multiple prevalent only
-
-#More than one new MI code separated by 28 days or more
-
-list<-unique(onlyprev$eid)
-checkp<-list()
-
-for (i in 1:length(list)) {
-  temp<-paste(list[i])
-  checkp[[i]]<-onlyprev[which(onlyprev$eid==temp),]
-  checkp[[i]]$max1<-max(checkp[[i]]$numericdiff1)-min(checkp[[i]]$numericdiff1)
-  checkp[[i]]$max2<-max(checkp[[i]]$numericdiff2)-min(checkp[[i]]$numericdiff2)
-}
-
-
-temp<-do.call(rbind.data.frame, checkp)
-mult1<-temp[which(temp$max1>=28 | temp$max2>=28),]
-
-#Any subsequent MI code
-
-mult2<-onlyprev[which(onlyprev$diag_icd10%in%subsqmi),]
-
-#An old MI code at the same time as MI code or 7 days or less after
-incl<-onlyprev[which(onlyprev$diag_icd10%in%oldmi),]
-temp<-onlyprev[which(onlyprev$eid%in%incl$eid),]
-
-list<-unique(temp$eid)
-test<-list()
-
-for (i in 1:length(list)) {
-  id<-paste(list[i])
-  test[[i]]<-temp[which(temp$eid==id),]
-  #If more than two entries they have multiple MI anyway
-  test[[i]]$yes[nrow(test[[i]]>2)]<-1
-  test[[i]]$max1<-max(test[[i]]$numericdiff1)-min(test[[i]]$numericdiff1)
-  test[[i]]$max2<-max(test[[i]]$numericdiff2)-min(test[[i]]$numericdiff2)
-  test[[i]]$yes[test[[i]]$max1<8 | test[[i]]$max2<8]<-1
-}
-mult3a<-do.call(rbind.data.frame, test)
-mult3b<-mult3a[which(mult3a$yes==1),]
-multprev<-output[which(output$eid%in%mult1$eid 
-                      |output$eid%in%mult2$eid
-                      |output$eid%in%mult3b$eid),]
-
-#Output
-output$Level3[output$eid%in%row1$eid]<-"Single MI"
-output$Level3[output$Level2=="Incident & prevalent MI"
-              |output$eid%in%multinc$eid
-              |output$eid%in%multprev$eid]<-"Multiple MI"
-
-
-
 
 ########################################
 #Second row: Other secondary care codes#
