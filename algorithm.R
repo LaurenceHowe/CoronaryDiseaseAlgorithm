@@ -452,7 +452,7 @@ output$Level2[output$eid %in% row8$eid
 #Ninth row: self-reported MI 
 #a) Inclusion
 
-#First self-report question on MI
+#First self-report question on MI: Non-cancer illness code, self-reported
 question1 <- selfreport[,c(1, 14:42)]
 miq1 <- c("1075")
 
@@ -460,7 +460,7 @@ question1$mi <- apply(question1, 1, function(r) any(r %in% miq1))
 temp1a <- question1[which(question1$mi == TRUE), ]
 temp1b <- temp1a[, c(1)]
 
-#Second self-report question on MI
+#Second self-report question on MI: Vascular/heart problems diagnosed by doctor
 question2 <- selfreport[,c(1:13)]
 miq2 <- c("1")
 
@@ -493,13 +493,13 @@ output$Level2[output$eid %in% row9$eid] <- "Unverifiable prevalent MI"
 #Tenth row: self-reported angina
 #a) Inclusion
 
-#Angina self-report question 1
+#Angina self-report question 1: Non-cancer illness code, self-reported
 angina1 <- c("1074")
 question1$angina <- apply(question1, 1, function(r) any(r %in% angina1))
 temp1a <- question1[which(question1$angina == TRUE), ]
 temp1b <- temp1a[, c(1)]
 
-#Angina self-report question 2
+#Angina self-report question 2: Vascular/heart problems diagnosed by doctor
 angina2 <- c("2")
 question2$angina <- apply(question2, 1, function(r) any(r %in% angina2))
 temp2a <- question2[which(question2$angina == TRUE), ]
@@ -527,6 +527,7 @@ output$Level1[output$eid %in% row10$eid] <- "Possible CAD"
 #c) Level II
 
 output$Level2[output$eid %in% row10$eid] <- "Unverifiable prevalent UA"
+                          
 ###
 #Eleventh row: death from other cause 
 
