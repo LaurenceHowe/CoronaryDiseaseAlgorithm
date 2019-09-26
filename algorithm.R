@@ -333,8 +333,41 @@ output$Level2[output$eid %in% onlyinc$eid] <- "Incident revasc"
 output$Level2[output$eid %in% anyinc$eid
               & output$eid %in% anyprev$eid] <- "Incident & prevalent revasc"
 
+                            
+####
+#Seventh row: Death records CAD 
+
+#a) Inclusion criteria
+
+cadicd <- c("Z955", "I250", "I251", "I253", "I254", "I255", "I256", "I258", "I259",
+            "I248", "I249", "I240")
+
+death$caddeath <- apply(death, 1, function(r) any(r %in% cadicd))
+
+row7 <- death[which(death$caddeath == 1
+                    & ! death$eid %in% row1$eid #Remove individuals in previous rows
+                    & ! death$eid %in% row2$eid
+                    & ! death$eid %in% row3$eid
+                    & ! death$eid %in% row4$eid
+                    & ! death$eid %in% row5$eid
+                    & ! death$eid %in% row6$eid), ]
+#b) Level I
+#Output
+output$Level1[output$eid %in% row7$eid] <- "CAD"
+
+#c) Level II
+#Primary cause of death
+primary <- row7[, c(1:4)]
+primary$cadprimary <- apply(primary, 1, function(r) any(r %in% cadicd))
+caddeathyes <- primary[which(primary$cadprimary == TRUE), ]
+
+#Output
+output$Level2[output$eid %in% caddeathyes$eid] <- "Unknown date CAD"
+output$Level2[output$eid %in% row7$eid
+              & ! output$eid %in% caddeathyes$eid] <- "CAD death"
+                            
 ###
-#Seventh row: Self-reported CAD procedures
+#Eighth row: Self-reported CAD procedures
 
 #a) Inclusion criteria
 
@@ -351,23 +384,24 @@ selfreportops$angioplasty <- apply(selfreportops, 1, function(r) any(r %in% angp
 selfreportops$angiogram <- apply(selfreportops, 1, function(r) any(r %in% angg))
 
 
-row7 <- selfreportops[which(selfreportops$incl == 1
+row8 <- selfreportops[which(selfreportops$incl == 1
                           & ! selfreportops$eid %in% row1$eid #Remove individuals in previous rows
                           & ! selfreportops$eid %in% row2$eid
                           & ! selfreportops$eid %in% row3$eid
                           & ! selfreportops$eid %in% row4$eid
                           & ! selfreportops$eid %in% row5$eid
-                          & ! selfreportops$eid %in% row6$eid), ]
+                          & ! selfreportops$eid %in% row6$eid
+                          & ! selfreportops$eid %in% row7$eid), ]
 
 
 #b) Level I
                                  
-cabgyes <- row7[which(row7$cabg == TRUE), ] #CABG 
-angpyes <- row7[which(row7$angioplasty == TRUE #Angioplasty with no CABG
-                    & row7$cabg == FALSE), ]
-anggyes <- row7[which(row7$angiogram == TRUE #Angiogram with no Angioplasty or CABG
-                    & row7$cabg == FALSE
-                    & row7$angioplasty == FALSE), ]
+cabgyes <- row8[which(row8$cabg == TRUE), ] #CABG 
+angpyes <- row8[which(row8$angioplasty == TRUE #Angioplasty with no CABG
+                    & row8$cabg == FALSE), ]
+anggyes <- row8[which(row8$angiogram == TRUE #Angiogram with no Angioplasty or CABG
+                    & row8$cabg == FALSE
+                    & row8$angioplasty == FALSE), ]
 
 #CAD medications at baseline: statins or aspirin codes
 
@@ -388,18 +422,19 @@ output$Level1[output$eid %in% cabgyes$eid] <- "CAD"
 output$Level1[output$eid %in% angpyes$eid
               & output$eid %in% medsyes$eid] <- "CAD"
 
-#Angioplasty with no meds = Possible CAD
+#Angioplasty with no meds = Self-report CAD
 output$Level1[output$eid %in% angpyes$eid
-              & ! output$eid %in% medsyes$eid] <- "Possible CAD"
+              & ! output$eid %in% medsyes$eid] <- "Self-report CAD"
 
-#Angiogram with meds = Possible CAD
+#Angiogram with meds = CAD
 output$Level1[output$eid %in% anggyes$eid
-              & output$eid %in% medsyes$eid] <- "Possible CAD"
+              & output$eid %in% medsyes$eid] <- "CAD"
 
-#Angiogram with no meds = No CAD
+#Angiogram with no meds = Self-report CAD
                              
 output$Level1[output$eid %in% anggyes$eid
-              & ! output$eid %in% medsyes$eid] <- "No CAD"
+              & ! output$eid %in% medsyes$eid] <- "Self-report CAD"
+
 
 #c) Level II
                              
@@ -413,39 +448,6 @@ output$Level2[output$eid %in% angpyes$eid
 output$Level2[output$eid %in% anggyes$eid
               & output$eid %in% medsyes$eid] <- "Unverifiable prevalent CAD"
 
-
-####
-#Eighth row: Death records CAD 
-
-#a) Inclusion criteria
-
-cadicd <- c("Z955", "I250", "I251", "I253", "I254", "I255", "I256", "I258", "I259",
-            "I248", "I249", "I240")
-
-death$caddeath <- apply(death, 1, function(r) any(r %in% cadicd))
-
-row8 <- death[which(death$caddeath == 1
-                    & ! death$eid %in% row1$eid #Remove individuals in previous rows
-                    & ! death$eid %in% row2$eid
-                    & ! death$eid %in% row3$eid
-                    & ! death$eid %in% row4$eid
-                    & ! death$eid %in% row5$eid
-                    & ! death$eid %in% row6$eid
-                    & ! death$eid %in% row7$eid), ]
-#b) Level I
-#Output
-output$Level1[output$eid %in% row8$eid] <- "CAD"
-
-#c) Level II
-#Primary cause of death
-primary <- row8[, c(1:4)]
-primary$cadprimary <- apply(primary, 1, function(r) any(r %in% cadicd))
-caddeathyes <- primary[which(primary$cadprimary == TRUE), ]
-
-#Output
-output$Level2[output$eid %in% caddeathyes$eid] <- "CAD death"
-output$Level2[output$eid %in% row8$eid
-              & ! output$eid %in% caddeathyes$eid] <- "Incident CAD"
 
 
 ###
